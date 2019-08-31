@@ -1721,13 +1721,13 @@ static int memblock_debug_show(struct seq_file *m, void *private)
 		reg = &type->regions[i];
 		seq_printf(m, "%4d: ", i);
 		if (sizeof(phys_addr_t) == 4)
-			seq_printf(m, "0x%08lx..0x%08lx\n",
+			seq_printf(m, "0x%08lx..0x%08lx,size:0x%08lx\n",
 				   (unsigned long)reg->base,
-				   (unsigned long)(reg->base + reg->size - 1));
+				   (unsigned long)(reg->base + reg->size - 1), (unsigned long)reg->size);
 		else
-			seq_printf(m, "0x%016llx..0x%016llx\n",
+			seq_printf(m, "0x%016llx..0x%016llx, size:0x%016llx\n",
 				   (unsigned long long)reg->base,
-				   (unsigned long long)(reg->base + reg->size - 1));
+				   (unsigned long long)(reg->base + reg->size - 1), (unsigned long long)reg->size);
 
 	}
 	return 0;
