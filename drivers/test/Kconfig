@@ -1,0 +1,21 @@
+#
+# test config
+#
+
+menu "test driver Support"
+
+config TEST
+	tristate "test driver"
+	help
+	  Say Y here if you want test.
+
+if TEST
+
+config PROC_TEST_DEBUG
+	tristate "support proc test debug"
+	help
+	  support proc test debug
+
+endif # TEST
+
+endmenu
