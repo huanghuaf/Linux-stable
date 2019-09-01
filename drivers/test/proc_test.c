@@ -7,6 +7,8 @@
 #include <linux/moduleparam.h>
 #include <linux/uaccess.h>
 
+#define MAX_LATENCY_TIME	(100 * 1000)	/* us */
+
 struct proc_test_key_op {
 	void (*handler)(int);
 	char *help_msg;
@@ -35,7 +37,7 @@ static void proc_test_handle_irq_latency_test(int key)
 	spin_lock_irqsave(&proc_test_lock, flags);
 
 	/*try to close irq for a long time*/
-	while (delt < (100*1000)) {
+	while (delt < MAX_LATENCY_TIME) {
 		do_gettimeofday(&tv2);
 		delt = (tv2.tv_sec - tv1.tv_sec) * 1000000 + tv2.tv_usec - tv1.tv_usec;		//us
 	}
