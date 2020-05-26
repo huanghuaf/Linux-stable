@@ -27,6 +27,20 @@
 		#interrupt-cells = <1>;
 		ranges;
 
+		ion {
+			compatible = "vexpress,ion";
+
+			ion-system-heap {
+				compatible = "vexpress,sys_user";
+			};
+			ion-sys_contig-heap {
+				compatible = "vexpress,sys_contig";
+			};
+			ion-cma-heap {
+				compatible = "vexpress,cma";
+			};
+		};
+
 		flash@0,00000000 {
 			compatible = "arm,vexpress-flash", "cfi-flash";
 			reg = <0 0x00000000 0x04000000>,

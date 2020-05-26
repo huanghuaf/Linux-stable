@@ -42,6 +42,13 @@ config ION_HISI
 
 source "drivers/staging/android/ion/hisilicon/Kconfig"
 
+config ION_VEXPRESS
+	tristate "Ion for vexpress"
+	depends on ARCH_VEXPRESS && ION
+	select ION_OF
+	help
+	  Choose this option if you wish to use ion on vexpress Platform.
+
 config ION_OF
 	bool "Devicetree support for Ion"
 	depends on ION && OF_ADDRESS
