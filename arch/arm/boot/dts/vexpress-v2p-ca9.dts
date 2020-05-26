@@ -19,7 +19,7 @@
 	#size-cells = <1>;
 
 	chosen {
-		bootargs = "rdinit=/sbin/init console=ttyAMA0 loglevel=8";
+		bootargs = "rdinit=/sbin/init console=ttyAMA0 loglevel=8 cma=64M";
 	};
 
 	aliases {
