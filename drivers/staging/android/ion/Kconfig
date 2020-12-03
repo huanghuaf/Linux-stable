@@ -17,6 +17,13 @@ config ION_TEST
 	  Choose this option to create a device that can be used to test the
 	  kernel and device side ION functions.
 
+config DMABUF_TEST
+	tristate "Dmabuf Test Device"
+	depends on ION
+	help
+	  Choose this option to create a device that can be used to test the
+	  dmabuf functions.
+
 config ION_DUMMY
 	bool "Dummy Ion driver"
 	depends on ION
