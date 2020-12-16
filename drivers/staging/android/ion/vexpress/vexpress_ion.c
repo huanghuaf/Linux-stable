@@ -37,6 +37,24 @@ static struct ion_of_heap vexpress_heaps[] = {
 	{}
 };
 
+struct ion_device *g_idev = NULL;
+
+struct ion_client *vexpress_ion_client_create(char *name)
+{
+	/*
+	* The assumption is that if there is a NULL device, the ion
+	* driver has not yet probed.
+	*/
+	if (IS_ERR_OR_NULL(g_idev))
+		return ERR_PTR(-EPROBE_DEFER);
+
+	if (IS_ERR(g_idev))
+		return (struct ion_client *)g_idev;
+
+	return ion_client_create(g_idev, name);
+}
+EXPORT_SYMBOL(vexpress_ion_client_create);
+
 static int vexpress_ion_probe(struct platform_device *pdev)
 {
 	struct vexpress_ion_dev *ipdev;
@@ -52,6 +70,7 @@ static int vexpress_ion_probe(struct platform_device *pdev)
 	if (IS_ERR(ipdev->idev))
 		return PTR_ERR(ipdev->idev);
 
+	g_idev = ipdev->idev;
 	ipdev->data = ion_parse_dt(pdev, vexpress_heaps);
 	if (IS_ERR(ipdev->data))
 		return PTR_ERR(ipdev->data);
