@@ -115,3 +115,7 @@ all.config
 
 # Kdevelop4
 *.kdev4
+
+#
+drivers/staging/android/ion/demo/client
+drivers/staging/android/ion/demo/service
