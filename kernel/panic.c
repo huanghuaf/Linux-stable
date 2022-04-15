@@ -26,6 +26,7 @@
 #include <linux/nmi.h>
 #include <linux/console.h>
 #include <linux/bug.h>
+#include <asm/cacheflush.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -248,6 +249,10 @@ void panic(const char *fmt, ...)
 
 	if (!panic_blink)
 		panic_blink = no_blink;
+
+	pr_emerg("flush all cache\n");
+	flush_cache_all();
+	pr_emerg("flush all cache done\n");
 
 	if (panic_timeout > 0) {
 		/*
