@@ -57,10 +57,21 @@ static struct proc_test_key_op proc_test_loglevel_op = {
 	.action_msg	= "Changing Loglevel",
 };
 
+static void proc_test_softlock_func(int key)
+{
+	while(1);
+}
+
 static struct proc_test_key_op proc_test_irq_latency_op = {
 	.handler	= proc_test_handle_irq_latency_test,
 	.help_msg	= "irq_latency_test",
 	.action_msg	= "test ftrace debug irq latency",
+};
+
+static struct proc_test_key_op proc_test_softlock_op = {
+	.handler	= proc_test_softlock_func,
+	.help_msg	= "softlock test",
+	.action_msg	= "test softlock in kernel"
 };
 
 static struct proc_test_key_op *proc_test_key_table[36] = {
@@ -92,7 +103,7 @@ static struct proc_test_key_op *proc_test_key_table[36] = {
 	NULL,				/* p */
 	NULL,				/* q */
 	NULL,				/* r */
-	NULL,				/* s */
+	&proc_test_softlock_op,		/* s */
 	NULL,				/* t */
 	NULL,				/* u */
 	NULL,				/* v */
