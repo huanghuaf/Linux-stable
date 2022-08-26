@@ -16,15 +16,11 @@ else
 		if [ "x" = "x$(cat .config | grep CONFIG_ARM=y)" ]; then
 			make distclean;
 			make ARCH=$1 vexpress_defconfig
-		else
-			echo "Not support ARCH $1"
 		fi
 	elif [ "x$1" = "xarm64" ]; then
 		if [ "x" = "x$(cat .config | grep CONFIG_ARM64=y)" ]; then
 			make distclean;
 			make ARCH=$1 defconfig
-		else
-			echo "Not support ARCH $1"
 		fi
 	else
 		echo "Not support ARCH $1"
