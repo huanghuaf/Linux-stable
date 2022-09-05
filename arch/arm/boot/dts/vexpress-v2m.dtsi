@@ -41,6 +41,13 @@
 			};
 		};
 
+		Vdevice: vdevice@0 {
+			compatible = "irqlatency-test";
+			/* irq-gpios = <&port4b 22 GPIO_ACTIVE_HIGH>;    /* output low */
+			/* normal-gpios = <&port4b 23 GPIO_ACTIVE_HIGH>;    /*C7 input */
+			status = "okay";
+		};
+
 		flash@0,00000000 {
 			compatible = "arm,vexpress-flash", "cfi-flash";
 			reg = <0 0x00000000 0x04000000>,

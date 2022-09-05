@@ -16,6 +16,11 @@ config PROC_TEST_DEBUG
 	help
 	  support proc test debug
 
+config IRQ_LATENCY_TEST
+	tristate "irq latency test driver"
+	help
+	  Support irq latency test.
+
 endif # TEST
 
 endmenu
