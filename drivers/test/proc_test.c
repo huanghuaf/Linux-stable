@@ -6,6 +6,7 @@
 #include <linux/stat.h>
 #include <linux/moduleparam.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 
 #define MAX_LATENCY_TIME	(100 * 1000)	/* us */
 
@@ -62,6 +63,16 @@ static void proc_test_softlock_func(int key)
 	while(1);
 }
 
+static void proc_test_hardlock_func(int key)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&proc_test_lock, flags);
+	while(1)
+		msleep(100);
+	spin_unlock_irqrestore(&proc_test_lock, flags);
+}
+
 static struct proc_test_key_op proc_test_irq_latency_op = {
 	.handler	= proc_test_handle_irq_latency_test,
 	.help_msg	= "irq_latency_test",
@@ -72,6 +83,12 @@ static struct proc_test_key_op proc_test_softlock_op = {
 	.handler	= proc_test_softlock_func,
 	.help_msg	= "softlock test",
 	.action_msg	= "test softlock in kernel"
+};
+
+static struct proc_test_key_op proc_test_hardlock_op = {
+	.handler	= proc_test_hardlock_func,
+	.help_msg	= "hardlock test",
+	.action_msg	= "test hardlock in kernel"
 };
 
 static struct proc_test_key_op *proc_test_key_table[36] = {
@@ -92,7 +109,7 @@ static struct proc_test_key_op *proc_test_key_table[36] = {
 	NULL,				/* e */
 	NULL,				/* f */
 	NULL,				/* g */
-	NULL,				/* h */
+	&proc_test_hardlock_op,		/* h */
 	&proc_test_irq_latency_op,	/* i */
 	NULL,				/* j */
 	NULL,				/* k */
