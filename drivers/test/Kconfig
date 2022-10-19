@@ -21,6 +21,12 @@ config IRQ_LATENCY_TEST
 	help
 	  Support irq latency test.
 
+config CRASH_DUMP_ELF
+	bool "create elf header for kernel coredump"
+	depends on KEXEC_CORE
+	help
+	  we use the driver to generate kernel elf header.
+
 endif # TEST
 
 endmenu
