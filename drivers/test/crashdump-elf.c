@@ -35,6 +35,12 @@ struct crash_mem_range {
 	u64 start, end;
 };
 
+/* Backup for crash thread regs */
+struct crash_info {
+	struct pt_regs regs;
+	int die_flag;
+};
+
 struct crash_mem {
 	unsigned int nr_ranges;
 	struct crash_mem_range ranges[CRASH_MAX_RANGES];
@@ -53,6 +59,7 @@ struct crash_elf_data {
 };
 
 static struct crash_elf_data *ced;
+static DEFINE_PER_CPU(struct crash_info, crash_info);
 
 #ifdef CONFIG_ARM64
 #define printk_phdr(prefix, phdr)						\
@@ -79,23 +86,36 @@ do {									\
 static int crashdump_panic_handler(struct notifier_block *this,
 				unsigned long event, void *unused)
 {
-	struct pt_regs fixed_regs;
-	static struct pt_regs *old_regs = NULL;
+	unsigned int cpu;
+	struct crash_info *info;
 
-	if (event == DIE_OOPS) {
-		/* Only die chain can use this */
-		struct die_args *args = (struct die_args *)unused;
-		/* backup for crash thread regs */
-		old_regs = args->regs;
-	} else {
-		if (old_regs) {
-			crash_setup_regs(&fixed_regs, old_regs);
-			/* for crashing cpu */
-			crash_save_cpu(&fixed_regs, smp_processor_id());
+	for_each_present_cpu(cpu) {
+		info = per_cpu_ptr(&crash_info, cpu);
+		if (info->die_flag) {
+			crash_save_cpu(&info->regs, cpu);
 		}
 	}
 
 	return NOTIFY_OK;
+}
+
+static int crashdump_die_handler(struct notifier_block *this,
+				unsigned long event, void *unused)
+{
+	unsigned int this_cpu;
+	struct die_args *args = (struct die_args *)unused;
+	struct crash_info *info;
+
+	this_cpu = raw_smp_processor_id();
+
+	info = per_cpu_ptr(&crash_info, this_cpu);
+
+	info->die_flag = 1;
+	crash_setup_regs(&info->regs, args->regs);
+	crash_save_cpu(&info->regs, this_cpu);
+
+	return NOTIFY_OK;
+
 }
 
 static struct notifier_block crashdump_panic_event_nb = {
@@ -104,7 +124,7 @@ static struct notifier_block crashdump_panic_event_nb = {
 };
 
 static struct notifier_block crashdump_die_event_nb = {
-	.notifier_call	= crashdump_panic_handler,
+	.notifier_call	= crashdump_die_handler,
 	.priority	= 0x0,	/* we need to be notified last */
 };
 
