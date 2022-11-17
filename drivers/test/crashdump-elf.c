@@ -174,9 +174,11 @@ static int prepare_elf_headers(struct crash_elf_data *ced)
 	elf_sz = sizeof(struct elfhdr) + nr_phdr * sizeof(struct elf_phdr);
 	elf_sz = ALIGN(elf_sz, ELF_CORE_HEADER_ALIGN);
 
-	buf = kzalloc(elf_sz, GFP_KERNEL);
-	if (!buf)
+	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(elf_sz));
+	if (IS_ERR_OR_NULL(page))
 		return -ENOMEM;
+
+	buf = page_to_virt(page);
 
 	bufp = buf;
 	ehdr = (struct elfhdr *)bufp;
