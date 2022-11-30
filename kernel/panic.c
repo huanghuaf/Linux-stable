@@ -194,12 +194,19 @@ void panic(const char *fmt, ...)
 		printk_nmi_flush_on_panic();
 		__crash_kexec(NULL);
 
+		/* Need send smp stop in panic callback for save pt_regs
+		 * As crash_smp_send_stop() will be called in __crash_kexec()
+		 * but we don't support kdump, so we send IPI_CPU_CRASH_STOP
+		 * in panic callback.
+		 */
+#ifndef CONFIG_CRASH_DUMP_ELF
 		/*
 		 * Note smp_send_stop is the usual smp shutdown function, which
 		 * unfortunately means it may not be hardened to work in a
 		 * panic situation.
 		 */
 		smp_send_stop();
+#endif
 	} else {
 		/*
 		 * If we want to do crash dump after notifier calls and

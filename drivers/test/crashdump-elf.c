@@ -88,11 +88,24 @@ static int crashdump_panic_handler(struct notifier_block *this,
 {
 	unsigned int cpu;
 	struct crash_info *info;
+	unsigned int this_cpu;
+
+#ifdef CONFIG_ARM
+	/* arm64 not support now */
+	crash_smp_send_stop();
+#endif
+
+	this_cpu = raw_smp_processor_id();
 
 	for_each_present_cpu(cpu) {
 		info = per_cpu_ptr(&crash_info, cpu);
-		if (info->die_flag) {
+		if (info->die_flag)
 			crash_save_cpu(&info->regs, cpu);
+		else {
+			if (cpu == this_cpu) {
+				crash_setup_regs(&info->regs, NULL);
+				crash_save_cpu(&info->regs, cpu);
+			}
 		}
 	}
 
