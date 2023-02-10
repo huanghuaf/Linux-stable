@@ -26,7 +26,7 @@
 #include <linux/kdebug.h>
 
 #define ELF_CORE_HEADER_ALIGN   4096
-
+#define CRASHDUMP_MAGIC		"crashdump"
 /* This primarily represents number of split ranges due to exclusion */
 #define CRASH_MAX_RANGES	16
 
@@ -46,19 +46,30 @@ struct crash_mem {
 	struct crash_mem_range ranges[CRASH_MAX_RANGES];
 };
 
+struct crash_elf_header {
+	unsigned char magic[16];
+	/* elf header phy addr */
+	u64 elf_load_addr;
+	/* dump flag */
+	int dump_flag;
+};
+
 /* Misc data about ram ranges needed to prepare elf headers */
 struct crash_elf_data {
+	/* Must keep in first to pass to preloader */
+	struct crash_elf_header header;
 	/* Pointer to elf header */
 	void *ehdr;
 	/* Pointer to next phdr */
 	void *bufp;
-	/* elf header phy addr */
-	phys_addr_t elf_load_addr;
 	/* record system ram chunk */
 	struct crash_mem mem;
+	/* sysfs interface */
+	struct class crashdump_class;
 };
 
 static struct crash_elf_data *ced;
+int __read_mostly dump_flag = 1;
 static DEFINE_PER_CPU(struct crash_info, crash_info);
 
 #ifdef CONFIG_ARM64
@@ -82,6 +93,49 @@ do {									\
 		(phdr)->p_vaddr, (phdr)->p_filesz, (phdr)->p_memsz);	\
 } while(0)
 #endif
+
+core_param(crashdump, dump_flag, int, 0644);
+
+static ssize_t store_enable(struct class *class, struct class_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct crash_elf_data *ced = container_of(class, struct crash_elf_data,
+						  crashdump_class);
+	int val;
+	int ret;
+
+
+	ret = kstrtoint(buf, 10, &val);
+	if (ret)
+		return ret;
+
+	if (val) {
+		dump_flag = 1;
+		ced->header.dump_flag = 1;
+	} else {
+		dump_flag = 0;
+		ced->header.dump_flag = 0;
+	}
+
+	return count;
+}
+
+static ssize_t show_enable(struct class *class, struct class_attribute *attr,
+			char *buf)
+{
+	struct crash_elf_data *ced = container_of(class, struct crash_elf_data,
+						  crashdump_class);
+
+	if (ced->header.dump_flag > 0)
+		return snprintf(buf, 8, "enable\n");
+	else
+		return snprintf(buf, 9, "disable\n");
+}
+
+static struct class_attribute crashdump_class_attrs[] = {
+	__ATTR(enable, 0644, show_enable, store_enable),
+	__ATTR_NULL,
+};
 
 static int crashdump_panic_handler(struct notifier_block *this,
 				unsigned long event, void *unused)
@@ -259,7 +313,7 @@ static int prepare_elf_headers(struct crash_elf_data *ced)
 		return -EINVAL;
 	}
 
-	ced->elf_load_addr = page_to_phys(page);
+	ced->header.elf_load_addr = page_to_phys(page);
 
 	ced->ehdr = ehdr;
 	ced->bufp = bufp;
@@ -270,16 +324,36 @@ static int prepare_elf_headers(struct crash_elf_data *ced)
 static int crashdump_elf_initcall(void)
 {
 	int ret;
+	phys_addr_t ced_addr;
+	struct page *page = NULL;
 
-	ced = (struct crash_elf_data *)kzalloc(sizeof(struct crash_elf_data), GFP_KERNEL);
-	if (!ced)
+	page = alloc_pages(GFP_KERNEL | __GFP_ZERO,
+			   get_order(sizeof(struct crash_elf_data)));
+	if (IS_ERR_OR_NULL(page))
 		return -ENOMEM;
+
+	ced = (struct crash_elf_data *)page_to_virt(page);
+	ced_addr = page_to_phys(page);
+
+	memcpy(ced->header.magic, CRASHDUMP_MAGIC, strlen(CRASHDUMP_MAGIC));
+	ced->header.dump_flag = dump_flag;
+
+	ced->crashdump_class.name = "crashdump_class";
+	ced->crashdump_class.owner = THIS_MODULE;
+	ced->crashdump_class.class_attrs = crashdump_class_attrs;
+	ret = class_register(&(ced->crashdump_class));
+	if (ret < 0) {
+		pr_err("register pfm class failed: %d\n", ret);
+		__free_pages(page, get_order(sizeof(struct crash_elf_data)));
+	}
 
 	fill_up_crash_elf_data(ced);
 
 	ret = prepare_elf_headers(ced);
 	if (ret) {
 		pr_err("prepare elf headers error\n");
+		class_unregister(&(ced->crashdump_class));
+		__free_pages(page, get_order(sizeof(struct crash_elf_data)));
 		return ret;
 	}
 
