@@ -343,8 +343,8 @@ static int crashdump_elf_initcall(void)
 	ced->crashdump_class.class_attrs = crashdump_class_attrs;
 	ret = class_register(&(ced->crashdump_class));
 	if (ret < 0) {
-		pr_err("register pfm class failed: %d\n", ret);
-		__free_pages(page, get_order(sizeof(struct crash_elf_data)));
+		pr_err("register crashdump_class class failed: %d\n", ret);
+		ced->crashdump_class.name = NULL;
 	}
 
 	fill_up_crash_elf_data(ced);
@@ -352,7 +352,8 @@ static int crashdump_elf_initcall(void)
 	ret = prepare_elf_headers(ced);
 	if (ret) {
 		pr_err("prepare elf headers error\n");
-		class_unregister(&(ced->crashdump_class));
+		if (ced->crashdump_class.name)
+			class_unregister(&(ced->crashdump_class));
 		__free_pages(page, get_order(sizeof(struct crash_elf_data)));
 		return ret;
 	}
