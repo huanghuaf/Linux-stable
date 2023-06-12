@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2022, Semidriver Semiconductor
  *
@@ -21,77 +22,38 @@
 #include <linux/kexec.h>
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
-#include <asm/io.h>
-#include <asm/kexec.h>
+#include <linux/io.h>
+#include <linux/kexec.h>
 #include <linux/kdebug.h>
-
-#define ELF_CORE_HEADER_ALIGN   4096
-#define CRASHDUMP_MAGIC		"crashdump"
-/* This primarily represents number of split ranges due to exclusion */
-#define CRASH_MAX_RANGES	16
-
-
-struct crash_mem_range {
-	u64 start, end;
-};
-
-/* Backup for crash thread regs */
-struct crash_info {
-	struct pt_regs regs;
-	int die_flag;
-};
-
-struct crash_mem {
-	unsigned int nr_ranges;
-	struct crash_mem_range ranges[CRASH_MAX_RANGES];
-};
-
-struct crash_elf_header {
-	unsigned char magic[16];
-	/* elf header phy addr */
-	u64 elf_load_addr;
-	/* dump flag */
-	int dump_flag;
-};
-
-/* Misc data about ram ranges needed to prepare elf headers */
-struct crash_elf_data {
-	/* Must keep in first to pass to preloader */
-	struct crash_elf_header header;
-	/* Pointer to elf header */
-	void *ehdr;
-	/* Pointer to next phdr */
-	void *bufp;
-	/* record system ram chunk */
-	struct crash_mem mem;
-	/* sysfs interface */
-	struct class crashdump_class;
-};
+#include <linux/cma.h>
+#include <linux/dma-contiguous.h>
+#include <linux/highmem.h>
+#include "crashdump.h"
 
 static struct crash_elf_data *ced;
 int __read_mostly dump_flag = 1;
 static DEFINE_PER_CPU(struct crash_info, crash_info);
 
 #ifdef CONFIG_ARM64
-#define printk_phdr(prefix, phdr)						\
-do {										\
-	pr_debug("%s: p_type = %u, p_offset = 0x%llx p_paddr = 0x%llx "	\
-		"p_vaddr = 0x%llx p_filesz = 0x%llx p_memsz = 0x%llx\n",	\
-		(prefix), (phdr)->p_type,					\
-		(unsigned long long)((phdr)->p_offset),				\
-		(unsigned long long)((phdr)->p_paddr),				\
-		(unsigned long long)((phdr)->p_vaddr),				\
-		(unsigned long long)((phdr)->p_filesz),				\
-		(unsigned long long)((phdr)->p_memsz));				\
+#define printk_phdr(prefix, phdr)					\
+do {									\
+	pr_debug("%s: p_type = %u, p_offset = 0x%llx p_paddr = 0x%llx",	\
+		(prefix), (phdr)->p_type,				\
+		(unsigned long long)((phdr)->p_offset),			\
+		(unsigned long long)((phdr)->p_paddr));			\
+	pr_debug(" p_vaddr = 0x%llx p_filesz = 0x%llx p_memsz = 0x%llx\n",\
+		(unsigned long long)((phdr)->p_vaddr),			\
+		(unsigned long long)((phdr)->p_filesz),			\
+		(unsigned long long)((phdr)->p_memsz));			\
 } while(0)
 #else
 #define printk_phdr(prefix, phdr)					\
 do {									\
-	pr_debug("%s: p_type = %u, p_offset = 0x%x " "p_paddr = 0x%x "	\
-		"p_vaddr = 0x%x p_filesz = 0x%x p_memsz = 0x%x\n",	\
-		(prefix), (phdr)->p_type, (phdr)->p_offset, (phdr)->p_paddr, \
+	pr_debug("%s: p_type = %u, p_offset = 0x%x p_paddr = 0x%x",	\
+		(prefix), (phdr)->p_type, (phdr)->p_offset, (phdr)->p_paddr);\
+	pr_debug(" p_vaddr = 0x%x p_filesz = 0x%x p_memsz = 0x%x\n",	\
 		(phdr)->p_vaddr, (phdr)->p_filesz, (phdr)->p_memsz);	\
-} while(0)
+} while (0)
 #endif
 
 core_param(crashdump, dump_flag, int, 0644);
@@ -232,7 +194,7 @@ static int prepare_elf_headers(struct crash_elf_data *ced)
 	unsigned int cpu;
 	struct crash_mem *mem = &ced->mem;
 	int i;
-	struct page *page = NULL;
+	struct page *pages = NULL;
 
 	/* extra phdr for vmcoreinfo elf note */
 	nr_phdr = nr_cpus + 1;
@@ -241,11 +203,11 @@ static int prepare_elf_headers(struct crash_elf_data *ced)
 	elf_sz = sizeof(struct elfhdr) + nr_phdr * sizeof(struct elf_phdr);
 	elf_sz = ALIGN(elf_sz, ELF_CORE_HEADER_ALIGN);
 
-	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(elf_sz));
-	if (IS_ERR_OR_NULL(page))
+	pages = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(elf_sz));
+	if (IS_ERR_OR_NULL(pages))
 		return -ENOMEM;
 
-	buf = page_to_virt(page);
+	buf = page_to_virt(pages);
 
 	bufp = buf;
 	ehdr = (struct elfhdr *)bufp;
@@ -307,13 +269,7 @@ static int prepare_elf_headers(struct crash_elf_data *ced)
 		printk_phdr("Elf header", phdr);
 	}
 
-	page = virt_to_page(buf);
-	if (IS_ERR_OR_NULL(page)) {
-		pr_err("virt_to_page() error\n");
-		return -EINVAL;
-	}
-
-	ced->header.elf_load_addr = page_to_phys(page);
+	ced->header.elf_load_addr = page_to_phys(pages);
 
 	ced->ehdr = ehdr;
 	ced->bufp = bufp;
@@ -325,15 +281,45 @@ static int crashdump_elf_initcall(void)
 {
 	int ret;
 	phys_addr_t ced_addr;
-	struct page *page = NULL;
+	struct page *pages = NULL;
+	unsigned long size = PAGE_ALIGN(sizeof(struct crash_elf_data));
+	unsigned long nr_pages = size >> PAGE_SHIFT;
+	unsigned long align = get_order(size);
+	int cma_alloc_fail = 0;
 
-	page = alloc_pages(GFP_KERNEL | __GFP_ZERO,
-			   get_order(sizeof(struct crash_elf_data)));
-	if (IS_ERR_OR_NULL(page))
-		return -ENOMEM;
 
-	ced = (struct crash_elf_data *)page_to_virt(page);
-	ced_addr = page_to_phys(page);
+	/* use cma to keep phyaddr below 4G for ap1/ap2 */
+	pages = cma_alloc(dev_get_cma_area(NULL), nr_pages, align);
+	if (IS_ERR_OR_NULL(pages)) {
+		/* try again */
+		cma_alloc_fail = 1;
+		pages = alloc_pages(GFP_KERNEL | __GFP_ZERO | GFP_DMA32,
+				  get_order(sizeof(struct crash_elf_data)));
+		if (IS_ERR_OR_NULL(pages))
+			return -ENOMEM;
+	}
+
+	/* clear the page  from cma */
+	if (!cma_alloc_fail) {
+		if (PageHighMem(pages)) {
+			unsigned long nr_clear_pages = nr_pages;
+			struct page *page = pages;
+
+			while (nr_clear_pages > 0) {
+				void *vaddr = kmap_atomic(page);
+
+				memset(vaddr, 0, PAGE_SIZE);
+				kunmap_atomic(vaddr);
+				page++;
+				nr_clear_pages--;
+			}
+		} else {
+			memset(page_address(pages), 0, size);
+		}
+	}
+
+	ced = (struct crash_elf_data *)page_to_virt(pages);
+	ced_addr = page_to_phys(pages);
 
 	memcpy(ced->header.magic, CRASHDUMP_MAGIC, strlen(CRASHDUMP_MAGIC));
 	ced->header.dump_flag = dump_flag;
@@ -354,7 +340,11 @@ static int crashdump_elf_initcall(void)
 		pr_err("prepare elf headers error\n");
 		if (ced->crashdump_class.name)
 			class_unregister(&(ced->crashdump_class));
-		__free_pages(page, get_order(sizeof(struct crash_elf_data)));
+		if (cma_alloc_fail)
+			__free_pages(pages,
+				     get_order(sizeof(struct crash_elf_data)));
+		else
+			cma_release(dev_get_cma_area(NULL), pages, nr_pages);
 		return ret;
 	}
 
