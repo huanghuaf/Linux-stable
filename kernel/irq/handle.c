@@ -188,6 +188,11 @@ irqreturn_t handle_irq_event_percpu(struct irq_desc *desc)
 
 	if (!noirqdebug)
 		note_interrupt(desc, retval);
+
+#ifdef CONFIG_IRQ_STORM_DETECT
+	if (irq_storm_detect_enable)
+		irq_storm_check(desc);
+#endif
 	return retval;
 }
 

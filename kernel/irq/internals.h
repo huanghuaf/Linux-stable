@@ -19,6 +19,10 @@
 
 extern bool noirqdebug;
 
+#ifdef CONFIG_IRQ_STORM_DETECT
+extern unsigned int irq_storm_detect_enable;
+#endif
+
 extern struct irqaction chained_action;
 
 /*

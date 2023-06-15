@@ -6,3 +6,4 @@
 obj-$(CONFIG_PROC_TEST_DEBUG)		+= proc_test.o
 obj-$(CONFIG_IRQ_LATENCY_TEST)		+= irqlatency_test.o
 obj-$(CONFIG_CRASH_DUMP_ELF)		+= crashdump_elf.o
+obj-$(CONFIG_IRQ_STORM_DETECT)		+= irq_storm_detect.o

@@ -96,6 +96,11 @@ struct irq_desc {
 	int			parent_irq;
 	struct module		*owner;
 	const char		*name;
+#ifdef CONFIG_IRQ_STORM_DETECT
+	unsigned long long start_time;
+	unsigned int irq_storm_count;		/* for detecting irq storm */
+	unsigned int irq_storm_throttled;	/* irq storm throttled */
+#endif
 } ____cacheline_internodealigned_in_smp;
 
 #ifdef CONFIG_SPARSE_IRQ

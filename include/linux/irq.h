@@ -541,6 +541,10 @@ extern void note_interrupt(struct irq_desc *desc, irqreturn_t action_ret);
 /* Enable/disable irq debugging output: */
 extern int noirqdebug_setup(char *str);
 
+#ifdef CONFIG_IRQ_STORM_DETECT
+extern void irq_storm_check(struct irq_desc *desc);
+#endif
+
 /* Checks whether the interrupt can be requested by request_irq(): */
 extern int can_request_irq(unsigned int irq, unsigned long irqflags);
 

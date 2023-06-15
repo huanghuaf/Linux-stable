@@ -27,6 +27,66 @@ config CRASH_DUMP_ELF
 	help
 	  we use the driver to generate kernel elf header.
 
+config IRQ_STORM_DETECT
+	bool "Support interrupt storm detection"
+	help
+	  Say Y here if you want to enable irq storm detector. Enable this
+	  feature will introuce a slightly overhead to irq handle,but it
+	  will more useful for handle irq storm for keeping system
+	  more healthier.
+
+	  If you don't know what to do here, say N.
+
+config IRQ_STORM_DETECT_LIMIT
+	int "Count considered as an irq storm."
+	depends on IRQ_STORM_DETECT
+	range 10000 100000
+	default 10000
+	help
+	  Count considered as an irq storm throttled. When enable irq
+	  storm detector, we will count how many irq occur in per 100ms,
+	  if the number of interrupts generated over the irq storm
+	  throttled, we think the irq storm has happened in system.
+
+config IRQ_STORM_DEFAULT_ON
+	bool "Enable irq storm by default"
+	depends on IRQ_STORM_DETECT
+	default n
+	help
+	  If selectd, irq storm detect function will be enable
+	  at boot, otherwise it will be disabled.
+
+	  The selection made here can be overridden by using the kernel
+	  command line 'irqstorm_detect=' option.
+
+config PANIC_ON_IRQ_STORM
+	bool "Do panic after interrupt storm detected"
+	depends on IRQ_STORM_DETECT
+	default n
+	help
+	  Do panic when irq storm has been detected.
+	  This helps to collect cpu context as part of ramdump
+	  for post mortem analysis.
+
+	  If you don't know what to do here, say N.
+
+	  The selection made here can be overridden by using the kernel
+	  command line 'irqstorm_panic=' option.
+
+config IRQ_STORM_DISABLE_IRQ
+	bool "Disable IRQ after irq storm detected"
+	depends on IRQ_STORM_DETECT
+	default n
+	help
+	  Do irq disable when irq storm has been detected.
+	  This can fix the irq storm when irq storm has been detected,
+	  but the hardware may be can't use.
+
+	  If you don't know what to do here, say N.
+
+	  The selection made here can be overridden by using the kernel
+	  command line 'irqstorm_disable_irq=' option.
+
 endif # TEST
 
 endmenu

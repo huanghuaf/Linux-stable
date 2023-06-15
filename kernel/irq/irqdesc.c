@@ -112,6 +112,11 @@ static void desc_set_defaults(unsigned int irq, struct irq_desc *desc, int node,
 	desc->tot_count = 0;
 	desc->name = NULL;
 	desc->owner = owner;
+#ifdef CONFIG_IRQ_STORM_DETECT
+	desc->start_time = 0;
+	desc->irq_storm_count = 0;
+	desc->irq_storm_throttled = CONFIG_IRQ_STORM_DETECT_LIMIT;
+#endif
 	for_each_possible_cpu(cpu)
 		*per_cpu_ptr(desc->kstat_irqs, cpu) = 0;
 	desc_smp_init(desc, node, affinity);

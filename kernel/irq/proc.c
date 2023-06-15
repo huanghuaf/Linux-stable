@@ -281,6 +281,75 @@ static const struct file_operations irq_spurious_proc_fops = {
 	.release	= single_release,
 };
 
+#ifdef CONFIG_IRQ_STORM_DETECT
+#include <linux/uaccess.h>
+#include <linux/kernel.h>
+
+static int irq_storm_count_proc_show(struct seq_file *m, void *v)
+{
+	struct irq_desc *desc = irq_to_desc((long)m->private);
+
+	seq_printf(m, "irq_storm_count %u\n", desc->irq_storm_count);
+	return 0;
+}
+
+static int irq_storm_count_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, irq_storm_count_proc_show, PDE_DATA(inode));
+}
+
+static const struct file_operations irq_storm_count_proc_ops = {
+	.open		= irq_storm_count_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int irq_storm_throttled_proc_show(struct seq_file *m, void *v)
+{
+	struct irq_desc *desc = irq_to_desc((long)m->private);
+
+	seq_printf(m, "irq_storm_throttled %u\n", desc->irq_storm_throttled);
+	return 0;
+}
+
+static ssize_t irq_storm_throttled_proc_write(struct file *file,
+		const char __user *buffer, size_t count, loff_t *pos)
+{
+	unsigned int irq = (int)(long)PDE_DATA(file_inode(file));
+	struct irq_desc *desc = irq_to_desc(irq);
+	unsigned int irq_throttled;
+
+
+	if (kstrtouint_from_user(buffer, count, 0, &irq_throttled)) {
+		pr_err("Not in hex or decimal from.\n");
+		return -EINVAL;
+	}
+
+	if (irq_throttled < CONFIG_IRQ_STORM_DETECT_LIMIT) {
+		pr_err("irq throttled too small, keep default value\n");
+		irq_throttled = CONFIG_IRQ_STORM_DETECT_LIMIT;
+	}
+
+	desc->irq_storm_throttled = irq_throttled;
+	return count;
+}
+
+static int irq_storm_throttled_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, irq_storm_throttled_proc_show,
+			   PDE_DATA(inode));
+}
+
+static const struct file_operations irq_storm_proc_ops = {
+	.open		= irq_storm_throttled_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= irq_storm_throttled_proc_write,
+};
+#endif
+
 #define MAX_NAMELEN 128
 
 static int name_unique(unsigned int irq, struct irqaction *new_action)
@@ -365,6 +434,13 @@ void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 
 	proc_create_data("spurious", 0444, desc->dir,
 			 &irq_spurious_proc_fops, (void *)(long)irq);
+
+#ifdef CONFIG_IRQ_STORM_DETECT
+	proc_create_data("irqstorm_throttled", 0666, desc->dir,
+			 &irq_storm_proc_ops, (void *)(long)irq);
+	proc_create_data("irq_storm_count", 0444, desc->dir,
+			 &irq_storm_count_proc_ops, (void *)(long)irq);
+#endif
 
 out_unlock:
 	mutex_unlock(&register_lock);
