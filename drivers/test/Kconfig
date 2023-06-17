@@ -87,6 +87,10 @@ config IRQ_STORM_DISABLE_IRQ
 	  The selection made here can be overridden by using the kernel
 	  command line 'irqstorm_disable_irq=' option.
 
+config CMA_STRESS_TEST
+	tristate "cma stress device for userspace"
+	help
+	  help to debug cma alloc stress
 endif # TEST
 
 endmenu
