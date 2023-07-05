@@ -60,7 +60,10 @@ static struct proc_test_key_op proc_test_loglevel_op = {
 
 static void proc_test_softlock_func(int key)
 {
-	while(1);
+	spin_lock(&proc_test_lock);
+	while(1)
+		msleep(100);
+	spin_unlock(&proc_test_lock);
 }
 
 static void proc_test_hardlock_func(int key)
