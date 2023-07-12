@@ -103,10 +103,10 @@ static int __init cma_stress_test_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* FIXME: use dma_set_mask_and_coherent() and check result */
-	ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-	//ret = dma_set_mask_and_coherent(testdev->misc.parent,
-	//				DMA_BIT_MASK(32));
+	arch_setup_dma_ops(&pdev->dev, 0, 0, NULL, false);
+
+	ret = dma_set_mask_and_coherent(&pdev->dev,
+					DMA_BIT_MASK(48));
 	if (ret) {
 		pr_err("set dma and dma coherent mask fail, ret:%d\n", ret);
 		return ret;
@@ -138,10 +138,21 @@ static struct platform_driver cma_stress_test_platform_driver = {
 
 static int __init cma_stress_test_init(void)
 {
-	cma_stress_test_pdev = platform_device_register_simple("cma-stress-test",
-							-1, NULL, 0);
+	struct platform_device_info pdevinfo = {
+		.parent = NULL,
+		.name = "cma-stress-test",
+		.id = -1,
+		.res = NULL,
+		.num_res = 0,
+		.data = NULL,
+		.size_data = 0,
+		.dma_mask = DMA_BIT_MASK(48),
+	};
+
+	cma_stress_test_pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(cma_stress_test_pdev))
 		return PTR_ERR(cma_stress_test_pdev);
+
 
 	return platform_driver_probe(&cma_stress_test_platform_driver,
 				     cma_stress_test_probe);
