@@ -199,7 +199,9 @@ void panic(const char *fmt, ...)
 		 * but we don't support kdump, so we send IPI_CPU_CRASH_STOP
 		 * in panic callback.
 		 */
-#ifndef CONFIG_CRASH_DUMP_ELF
+#ifdef CONFIG_CRASH_DUMP_ELF
+		crash_smp_send_stop();
+#else
 		/*
 		 * Note smp_send_stop is the usual smp shutdown function, which
 		 * unfortunately means it may not be hardened to work in a

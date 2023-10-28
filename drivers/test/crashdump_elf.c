@@ -117,12 +117,6 @@ static int crashdump_panic_handler(struct notifier_block *this,
 		info = per_cpu_ptr(&crash_info, cpu);
 		if (info->die_flag)
 			crash_save_cpu(&info->regs, cpu);
-		else {
-			if (cpu == this_cpu) {
-				crash_setup_regs(&info->regs, NULL);
-				crash_save_cpu(&info->regs, cpu);
-			}
-		}
 	}
 
 	return NOTIFY_OK;
